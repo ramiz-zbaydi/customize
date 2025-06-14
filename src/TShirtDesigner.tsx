@@ -296,14 +296,33 @@ const DesignCanvas = React.forwardRef<HTMLCanvasElement, {
     drawCanvas();
   }, [drawCanvas]);
 
-  const handleMouseDown = (e: React.MouseEvent) => {
+  // Fonction générique pour gérer les coordonnées (souris ou tactile)
+  const getCoordinates = (e: React.MouseEvent | React.TouchEvent) => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!canvas) return { x: 0, y: 0 };
 
     const rect = canvas.getBoundingClientRect();
-    // Adapter les coordonnées de la souris pour la haute résolution
-    const x = (e.clientX - rect.left) * 2; // x2 car le canvas est 2x plus grand
-    const y = (e.clientY - rect.top) * 2;
+    let clientX, clientY;
+
+    if ('touches' in e) {
+      // Événement tactile
+      const touch = e.touches[0] || e.changedTouches[0];
+      clientX = touch.clientX;
+      clientY = touch.clientY;
+    } else {
+      // Événement souris
+      clientX = e.clientX;
+      clientY = e.clientY;
+    }
+
+    return {
+      x: (clientX - rect.left) * 2, // x2 car le canvas est 2x plus grand
+      y: (clientY - rect.top) * 2
+    };
+  };
+
+  const handleStart = (e: React.MouseEvent | React.TouchEvent) => {
+    const { x, y } = getCoordinates(e);
 
     // Check if clicking on design (adapter les coordonnées)
     if (design &&
@@ -311,7 +330,7 @@ const DesignCanvas = React.forwardRef<HTMLCanvasElement, {
         y >= design.y * 2 && y <= (design.y + design.height) * 2) {
       setSelectedElement('design');
       setIsDragging(true);
-      setIsRotating(e.shiftKey);
+      setIsRotating('shiftKey' in e ? e.shiftKey : false);
       setDragStart({ x: x - design.x * 2, y: y - design.y * 2 });
     }
     // Check if clicking on text area (adapter les coordonnées)
@@ -324,16 +343,11 @@ const DesignCanvas = React.forwardRef<HTMLCanvasElement, {
     }
   };
 
-  const handleMouseMove = (e: React.MouseEvent) => {
+  const handleMove = (e: React.MouseEvent | React.TouchEvent) => {
     if (!isDragging || !design) return;
 
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const rect = canvas.getBoundingClientRect();
-    // Adapter les coordonnées de la souris pour la haute résolution
-    const x = (e.clientX - rect.left) * 2;
-    const y = (e.clientY - rect.top) * 2;
+    e.preventDefault(); // Empêcher le scroll sur mobile
+    const { x, y } = getCoordinates(e);
 
     if (isRotating) {
       const centerX = (design.x + design.width / 2) * 2;
@@ -349,23 +363,36 @@ const DesignCanvas = React.forwardRef<HTMLCanvasElement, {
     }
   };
 
-  const handleMouseUp = () => {
+  const handleEnd = () => {
     setIsDragging(false);
     setIsRotating(false);
   };
 
+  // Gestionnaires pour souris
+  const handleMouseDown = (e: React.MouseEvent) => handleStart(e);
+  const handleMouseMove = (e: React.MouseEvent) => handleMove(e);
+  const handleMouseUp = () => handleEnd();
+
+  // Gestionnaires pour tactile
+  const handleTouchStart = (e: React.TouchEvent) => handleStart(e);
+  const handleTouchMove = (e: React.TouchEvent) => handleMove(e);
+  const handleTouchEnd = () => handleEnd();
+
   return (
-    <div className="flex justify-center">
+    <div className="flex justify-center p-4">
       <canvas
         ref={canvasRef}
         width={1200} // Haute résolution
         height={1200} // Haute résolution
-        className="border border-gray-200 rounded-lg cursor-crosshair max-w-full max-h-full"
-        style={{ width: '600px', height: '600px' }} // Affichage à taille normale
+        className="border border-gray-200 rounded-lg cursor-crosshair w-full max-w-md sm:max-w-lg md:max-w-xl lg:max-w-2xl aspect-square touch-none"
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        onTouchCancel={handleTouchEnd}
       />
     </div>
   );
@@ -545,114 +572,118 @@ const TShirtDesigner: React.FC = () => {
   const hasText = textOverlay.title || textOverlay.subtitle;
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4">
+    <div className="min-h-screen bg-gray-50 p-2 sm:p-4">
       <div className="max-w-7xl mx-auto">
-        {/* Header compact */}
-        <div className="text-center mb-4">
-          <h1 className="text-2xl font-bold text-gray-800 flex items-center justify-center gap-2">
-            <Sparkles className="w-6 h-6 text-blue-600" />
+        {/* Header responsive */}
+        <div className="text-center mb-4 sm:mb-6">
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-800 flex items-center justify-center gap-2">
+            <Sparkles className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600" />
             Créateur de T-Shirt
           </h1>
-          <p className="text-sm text-gray-600">Créez votre design personnalisé</p>
+          <p className="text-xs sm:text-sm text-gray-600 mt-1">Créez votre design personnalisé</p>
         </div>
 
-        <div className="flex gap-4 h-[calc(100vh-140px)]">
-          {/* Panel gauche - Controls compacts */}
-          <div className="w-80 space-y-3 overflow-y-auto">
-            
-            {/* Couleurs */}
-            <div className="bg-white rounded-lg border p-3">
-              <h3 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
-                <Palette className="w-4 h-4" />
-                Couleur
-              </h3>
-              <ColorSelector
-                colors={tshirtColors}
-                selectedColor={selectedColor}
-                onColorChange={handleColorChange}
-              />
-            </div>
-
-            {/* Texte */}
-            <div className="bg-white rounded-lg border p-3">
-              <h3 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
-                <Type className="w-4 h-4" />
-                Texte
-              </h3>
-              <TextControls
-                textOverlay={textOverlay}
-                onTextChange={handleTextChange}
-                onClearText={handleClearText}
-                hasText={hasText}
-              />
-            </div>
-
-            {/* Upload */}
-            <div className="bg-white rounded-lg border p-3">
-              <h3 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
-                <Upload className="w-4 h-4" />
-                Design
-              </h3>
-              <FileUpload
-                onFileUpload={handleDesignUpload}
-                hasDesign={!!design}
-                onClearDesign={handleClearDesign}
-              />
-            </div>
-
-            {/* Contrôles design */}
-            {design && (
+        {/* Layout responsive : colonne sur mobile, ligne sur desktop */}
+        <div className="flex flex-col lg:flex-row gap-4 lg:h-[calc(100vh-160px)]">
+          
+          {/* Panel de contrôles - au-dessus sur mobile, à gauche sur desktop */}
+          <div className="w-full lg:w-80 order-1 lg:order-1">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-3 lg:space-y-0 lg:overflow-y-auto lg:max-h-full">
+              
+              {/* Couleurs */}
               <div className="bg-white rounded-lg border p-3">
                 <h3 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
-                  <Move className="w-4 h-4" />
-                  Ajuster
+                  <Palette className="w-4 h-4" />
+                  Couleur
                 </h3>
-                <div className="flex items-center gap-2">
+                <ColorSelector
+                  colors={tshirtColors}
+                  selectedColor={selectedColor}
+                  onColorChange={handleColorChange}
+                />
+              </div>
+
+              {/* Texte */}
+              <div className="bg-white rounded-lg border p-3">
+                <h3 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+                  <Type className="w-4 h-4" />
+                  Texte
+                </h3>
+                <TextControls
+                  textOverlay={textOverlay}
+                  onTextChange={handleTextChange}
+                  onClearText={handleClearText}
+                  hasText={hasText}
+                />
+              </div>
+
+              {/* Upload */}
+              <div className="bg-white rounded-lg border p-3">
+                <h3 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+                  <Upload className="w-4 h-4" />
+                  Design
+                </h3>
+                <FileUpload
+                  onFileUpload={handleDesignUpload}
+                  hasDesign={!!design}
+                  onClearDesign={handleClearDesign}
+                />
+              </div>
+
+              {/* Contrôles design */}
+              {design && (
+                <div className="bg-white rounded-lg border p-3">
+                  <h3 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+                    <Move className="w-4 h-4" />
+                    Ajuster
+                  </h3>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={handleZoomOut}
+                      className="flex-1 bg-red-50 hover:bg-red-100 border border-red-200 text-red-700 py-2 px-3 rounded text-sm font-medium transition-colors duration-200 flex items-center justify-center gap-1"
+                    >
+                      <Minus className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={handleZoomIn}
+                      className="flex-1 bg-green-50 hover:bg-green-100 border border-green-200 text-green-700 py-2 px-3 rounded text-sm font-medium transition-colors duration-200 flex items-center justify-center gap-1"
+                    >
+                      <Plus className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-2">
+                    💡 Cliquez + glissez sur le t-shirt • Shift + glisser = rotation
+                  </p>
+                </div>
+              )}
+
+              {/* Bouton commander */}
+              {hasContent && (
+                <div className="bg-gradient-to-r from-green-500 to-blue-600 rounded-lg p-3 sm:col-span-2 lg:col-span-1">
                   <button
-                    onClick={handleZoomOut}
-                    className="flex-1 bg-red-50 hover:bg-red-100 border border-red-200 text-red-700 py-2 px-3 rounded text-sm font-medium transition-colors duration-200 flex items-center justify-center gap-1"
+                    onClick={handleOrderTShirt}
+                    disabled={isProcessing}
+                    className="w-full bg-white/20 hover:bg-white/30 text-white font-semibold py-3 px-4 rounded-lg transition-all duration-200 disabled:opacity-50 flex items-center justify-center gap-2"
                   >
-                    <Minus className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={handleZoomIn}
-                    className="flex-1 bg-green-50 hover:bg-green-100 border border-green-200 text-green-700 py-2 px-3 rounded text-sm font-medium transition-colors duration-200 flex items-center justify-center gap-1"
-                  >
-                    <Plus className="w-4 h-4" />
+                    {isProcessing ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                        Génération...
+                      </>
+                    ) : (
+                      <>
+                        <ShoppingCart className="w-4 h-4" />
+                        Télécharger PDF
+                      </>
+                    )}
                   </button>
                 </div>
-                <p className="text-xs text-gray-500 mt-2">
-                  💡 Cliquez + glissez sur le t-shirt • Shift + glisser = rotation
-                </p>
-              </div>
-            )}
-
-            {/* Bouton commander */}
-            {hasContent && (
-              <div className="bg-gradient-to-r from-green-500 to-blue-600 rounded-lg p-3">
-                <button
-                  onClick={handleOrderTShirt}
-                  disabled={isProcessing}
-                  className="w-full bg-white/20 hover:bg-white/30 text-white font-semibold py-3 px-4 rounded-lg transition-all duration-200 disabled:opacity-50 flex items-center justify-center gap-2"
-                >
-                  {isProcessing ? (
-                    <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
-                      Génération...
-                    </>
-                  ) : (
-                    <>
-                      <ShoppingCart className="w-4 h-4" />
-                      Télécharger PDF
-                    </>
-                  )}
-                </button>
-              </div>
-            )}
+              )}
+            </div>
           </div>
 
-          {/* Panel droite - Canvas */}
-          <div className="flex-1 bg-white rounded-2xl shadow-lg border overflow-hidden flex items-center justify-center">
+          {/* Canvas - en-dessous sur mobile, à droite sur desktop */}
+          <div className="flex-1 order-2 lg:order-2 bg-white rounded-lg sm:rounded-2xl shadow-lg border overflow-hidden">
             <DesignCanvas
               ref={canvasRef}
               design={design}
