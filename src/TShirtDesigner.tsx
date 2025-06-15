@@ -560,12 +560,12 @@ const TShirtDesigner: React.FC = () => {
       const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
       const filename = `tshirt-design-${timestamp}.pdf`;
 
-      // Télécharger le PDF dans un nouvel onglet
+      // Télécharger le PDF directement
       const pdfBlob = pdf.output('blob');
-      const url = URL.createObjectURL(pdfBlob);
-      window.open(url, '_blank');
-
-      alert(`✅ Votre maquette PDF est générée et s'ouvrira dans un nouvel onglet. Vous pouvez l'enregistrer manuellement.`);
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(pdfBlob);
+      link.download = filename;
+      link.click();
 
     } catch (error) {
       console.error('Erreur lors de l\'export PDF:', error);
