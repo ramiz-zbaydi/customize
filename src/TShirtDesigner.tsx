@@ -56,8 +56,8 @@ const ColorSelector: React.FC<{
           key={key}
           onClick={() => onColorChange(key)}
           className={`w-6 h-6 rounded-full border-2 transition-all duration-200 hover:scale-110 ${
-            selectedColor === key 
-              ? 'border-blue-500 ring-2 ring-blue-200' 
+            selectedColor === key
+              ? 'border-blue-500 ring-2 ring-blue-200'
               : 'border-gray-300 hover:border-gray-400'
           }`}
           style={{ backgroundColor: value }}
@@ -178,8 +178,8 @@ const TextControls: React.FC<{
               key={key}
               onClick={() => onTextChange({ ...textOverlay, color: value })}
               className={`w-5 h-5 rounded-full border transition-all duration-200 hover:scale-110 ${
-                textOverlay.color === value 
-                  ? 'border-blue-500 ring-1 ring-blue-200' 
+                textOverlay.color === value
+                  ? 'border-blue-500 ring-1 ring-blue-200'
                   : 'border-gray-300'
               }`}
               style={{ backgroundColor: value }}
@@ -519,10 +519,15 @@ const TShirtDesigner: React.FC = () => {
 
     try {
       const canvas = canvasRef.current;
-      
+
       // Créer un PDF avec jsPDF (chargé depuis CDN)
-      const { jsPDF } = window.jspdf;
-      
+      const jsPDF = (window as any).jspdf?.jsPDF;
+      if (!jsPDF) {
+        alert("❌ jsPDF n'est pas encore chargé. Réessayez dans un instant.");
+        setIsProcessing(false);
+        return;
+      }
+
       // Capturer le canvas en haute qualité
       const imageData = canvas.toDataURL('image/png', 1.0);
 
@@ -559,7 +564,7 @@ const TShirtDesigner: React.FC = () => {
       pdf.save(filename);
 
       alert(`🎉 Votre maquette PDF haute qualité "${filename}" a été téléchargée avec succès !`);
-      
+
     } catch (error) {
       console.error('Erreur lors de l\'export PDF:', error);
       alert('❌ Erreur lors de la génération du PDF. Vérifiez que jsPDF est chargé correctement.');
